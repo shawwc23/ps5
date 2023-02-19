@@ -5,28 +5,118 @@ date: "2023-02-15"
 output: html_document
 ---
 
+## 1. Load and check
+```{r}
+library(tidyverse)
+library(dplyr)
+gapminder <- read_delim("gapminder.csv.bz2")
+```
+The _gapminder_ data contains `r nrow(gapminder)` rows and `r ncol(gapminder)` columns.
 
+The _gapminder_ data contains `r nrow(gapminder)` rows and `r ncol(gapminder)` columns.
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+Sample of 5:
+```{r sample}
+gapminder %>% 
+  sample_n(5)
 ```
 
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+## 2. Descriptive Statistics
+Distinct countries and codes:
+```{r}
+gapminder %>% 
+  summarize(names = n_distinct(name), iso2 = n_distinct(iso2), iso3 = n_distinct(iso3))
 ```
 
-## Including Plots
 
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+There are two names that don't have an iso-2 code:
+```{r}
+gapminder %>% 
+  group_by(name) %>% 
+  filter(is.na(iso2)) %>% 
+  summarize(NA_iso2 = n_distinct(iso2))
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+There are 4 iso-3s that are assigned to a name that equals, NA:
+```{r}
+gapminder %>% 
+  group_by(iso3) %>% 
+  filter(is.na(name)) %>% 
+  summarize(NA_name = n_distinct(name))
+```
+
+```{r year}
+gapminder %>% 
+  filter(!is.na(time)) %>% 
+  summarize(Most_recent = max(time), Oldest = min(time))
+```
+
+## C02 Emissions
+
+```{r co2}
+gapminder %>% 
+  group_by(time) %>% 
+  filter(is.na(co2)) %>% 
+  summarize(nas_of_co2 = n()) %>% 
+  arrange(desc(nas_of_co2)) %>% 
+  head(5)
+```
+
+```{r co2_PC}
+gapminder %>% 
+  group_by(time) %>% 
+  filter(is.na(co2_PC)) %>% 
+  summarize(nas_of_co2_PC = n()) %>% 
+  arrange(desc(nas_of_co2_PC)) %>% 
+  head(5)
+```
+
+As the graph below shows, the U.S. and China are the largest co2 emissions contributers.
+
+```{r}
+co2plot = gapminder %>% 
+  filter(name %in% c("United States of America", "India", "France", "Mexico", "China", "Canada")) %>% 
+  group_by(name)
+ggplot(co2plot, aes(x = time, y = co2, group = name, col = name)) +
+  geom_line()
+```
+
+As seen in the figure below, although China is one of the biggest contributers to co2 emissions, they are a lot lower in terms of per capita. While Canada and the U.S. are the largest per capita.
+
+```{r}
+ggplot(co2plot, aes(x = time, y = co2_PC, group = name, col = name)) +
+  geom_line()
+```
+
+```{r}
+gapminder %>% 
+  group_by(region) %>% 
+  filter(!is.na(co2_PC)) %>% 
+  summarise(co2_PC_average = mean(co2_PC)) %>% 
+  arrange(desc(co2_PC_average))
+```
+
+
+```{r}
+df = gapminder %>% 
+  filter(!is.na(co2_PC), !is.na(region)) %>% 
+  filter(time %in% c(1960, 2016)) %>% 
+  group_by(time, region) %>% 
+  summarize(average_co2 = mean(co2_PC), .groups = "keep")
+  
+ggplot(data = df, aes(region, average_co2, fill = time)) + 
+       geom_bar(stat = 'identity', position = position_dodge2(0))
+```
+
+
+```{r}
+gapminder %>%
+  filter(time == 2016, !is.na(co2_PC)) %>% 
+  group_by(region) %>% 
+  filter(rank(desc(co2_PC)) <= 3) %>% 
+  select(time, name, co2_PC) %>% 
+  arrange(region)
+```
+
+
+```
